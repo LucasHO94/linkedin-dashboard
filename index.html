@@ -1,392 +1,115 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LinkedIn Bot — Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>AutoPost — Controle Remoto</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-        /* ============================================ */
-        /*  RESET & BASE                                */
-        /* ============================================ */
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
         :root {
-            --bg-primary: #0a0f1a;
-            --bg-card: rgba(17, 25, 40, 0.75);
-            --bg-card-hover: rgba(25, 35, 55, 0.85);
-            --border: rgba(255, 255, 255, 0.08);
-            --text-primary: #e8edf5;
-            --text-secondary: #8b95a8;
-            --accent-blue: #3b82f6;
-            --accent-green: #10b981;
-            --accent-amber: #f59e0b;
-            --accent-red: #ef4444;
-            --accent-purple: #8b5cf6;
-            --glass: rgba(255, 255, 255, 0.05);
+            --primary: #0077b5; --bg: #0f172a; --card: #1e293b; --text: #f8fafc;
         }
-
         body {
-            font-family: 'Inter', -apple-system, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            overflow-x: hidden;
+            font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text);
+            display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;
         }
-
-        /* Background gradient orbs */
-        body::before, body::after {
-            content: '';
-            position: fixed;
-            border-radius: 50%;
-            filter: blur(120px);
-            z-index: 0;
-            pointer-events: none;
-        }
-        body::before {
-            width: 600px; height: 600px;
-            background: rgba(59, 130, 246, 0.08);
-            top: -200px; right: -100px;
-        }
-        body::after {
-            width: 500px; height: 500px;
-            background: rgba(139, 92, 246, 0.06);
-            bottom: -100px; left: -100px;
-        }
-
-        /* ============================================ */
-        /*  LAYOUT                                      */
-        /* ============================================ */
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem 1.5rem;
-            position: relative;
-            z-index: 1;
+            background: var(--card); padding: 2rem; border-radius: 24px; width: 90%; max-width: 400px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
         }
-
-        /* ============================================ */
-        /*  HEADER                                      */
-        /* ============================================ */
-        .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 2.5rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 1px solid var(--border);
-        }
-        .header-left { display: flex; align-items: center; gap: 1rem; }
-        .header-icon {
-            width: 48px; height: 48px;
-            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
-            border-radius: 14px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.5rem;
-            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.25);
-        }
-        .header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
-        .header p { color: var(--text-secondary); font-size: 0.85rem; margin-top: 2px; }
-        .header-badge {
-            background: rgba(16, 185, 129, 0.12);
-            color: var(--accent-green);
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.78rem;
-            font-weight: 600;
-            border: 1px solid rgba(16, 185, 129, 0.2);
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-
-        /* ============================================ */
-        /*  STAT CARDS                                  */
-        /* ============================================ */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.2rem;
-            margin-bottom: 2.5rem;
-        }
-        .stat-card {
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 1.5rem;
+        h1 { font-weight: 600; margin-bottom: 0.5rem; color: var(--primary); }
+        p { opacity: 0.7; font-size: 0.9rem; margin-bottom: 2rem; }
+        
+        .btn-post {
+            background: linear-gradient(135deg, #0077b5 0%, #00a0dc 100%);
+            color: white; border: none; padding: 1.2rem 2rem; border-radius: 16px;
+            font-size: 1.1rem; font-weight: 600; cursor: pointer; width: 100%;
+            box-shadow: 0 10px 15px -3px rgba(0,119,181,0.4);
             transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
         }
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 3px;
-            border-radius: 16px 16px 0 0;
-        }
-        .stat-card:nth-child(1)::before { background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple)); }
-        .stat-card:nth-child(2)::before { background: linear-gradient(90deg, var(--accent-amber), #f97316); }
-        .stat-card:nth-child(3)::before { background: linear-gradient(90deg, var(--accent-green), #06d6a0); }
-        .stat-card:nth-child(4)::before { background: linear-gradient(90deg, var(--accent-red), #f97316); }
+        .btn-post:active { transform: scale(0.95); }
+        .btn-post:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .stat-card:hover {
-            transform: translateY(-4px);
-            background: var(--bg-card-hover);
-            border-color: rgba(255, 255, 255, 0.12);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        .status-feed {
+            margin-top: 2rem; text-align: left; background: rgba(0,0,0,0.2);
+            padding: 1rem; border-radius: 12px; font-size: 0.8rem;
         }
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 0.78rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            margin-bottom: 0.6rem;
+        .status-item { 
+            display: flex; justify-content: space-between; padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
-        .stat-value {
-            font-size: 2.2rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
+        .status-badge { 
+            padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;
         }
-        .stat-card:nth-child(1) .stat-value { color: var(--accent-blue); }
-        .stat-card:nth-child(2) .stat-value { color: var(--accent-amber); }
-        .stat-card:nth-child(3) .stat-value { color: var(--accent-green); }
-        .stat-card:nth-child(4) .stat-value { color: var(--accent-red); }
-
-        /* ============================================ */
-        /*  POSTS TABLE                                 */
-        /* ============================================ */
-        .section-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 1.2rem;
-        }
-        .section-title {
-            font-size: 1.15rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .table-wrapper {
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            overflow: hidden;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th {
-            text-align: left;
-            padding: 1rem 1.2rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: var(--text-secondary);
-            background: rgba(255, 255, 255, 0.02);
-            border-bottom: 1px solid var(--border);
-        }
-        td {
-            padding: 1rem 1.2rem;
-            font-size: 0.88rem;
-            border-bottom: 1px solid var(--border);
-            vertical-align: top;
-        }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: rgba(255, 255, 255, 0.02); }
-
-        .post-text {
-            max-width: 400px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            color: var(--text-secondary);
-        }
-        .post-topic {
-            font-weight: 500;
-            color: var(--text-primary);
-            margin-bottom: 4px;
-        }
-
-        /* Status badges */
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        .badge-pending {
-            background: rgba(245, 158, 11, 0.12);
-            color: var(--accent-amber);
-            border: 1px solid rgba(245, 158, 11, 0.2);
-        }
-        .badge-posted {
-            background: rgba(16, 185, 129, 0.12);
-            color: var(--accent-green);
-            border: 1px solid rgba(16, 185, 129, 0.2);
-        }
-        .badge-error {
-            background: rgba(239, 68, 68, 0.12);
-            color: var(--accent-red);
-            border: 1px solid rgba(239, 68, 68, 0.2);
-        }
-
-        /* Delete button */
-        .btn-delete {
-            background: rgba(239, 68, 68, 0.1);
-            color: var(--accent-red);
-            border: 1px solid rgba(239, 68, 68, 0.2);
-            padding: 6px 14px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.78rem;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        .btn-delete:hover {
-            background: rgba(239, 68, 68, 0.2);
-            transform: scale(1.05);
-        }
-
-        /* Empty state */
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: var(--text-secondary);
-        }
-        .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
-        .empty-state p { font-size: 0.9rem; }
-
-        /* ============================================ */
-        /*  FOOTER                                      */
-        /* ============================================ */
-        .footer {
-            text-align: center;
-            margin-top: 3rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid var(--border);
-            color: var(--text-secondary);
-            font-size: 0.78rem;
-        }
-
-        /* ============================================ */
-        /*  RESPONSIVE                                  */
-        /* ============================================ */
-        @media (max-width: 768px) {
-            .header { flex-direction: column; align-items: flex-start; gap: 1rem; }
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .post-text { max-width: 200px; }
-        }
+        .pending { background: #ca8a04; color: #fff; }
+        .done { background: #16a34a; color: #fff; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- HEADER -->
-        <div class="header">
-            <div class="header-left">
-                <div class="header-icon">🤖</div>
-                <div>
-                    <h1>LinkedIn Bot</h1>
-                    <p>Painel de Controle — Automação Inteligente</p>
-                </div>
-            </div>
-            <div class="header-badge">● Sistema Online</div>
-        </div>
 
-        <!-- STATS -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Total de Posts</div>
-                <div class="stat-value">{{ stats.total }}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Na Fila</div>
-                <div class="stat-value">{{ stats.pending }}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Publicados</div>
-                <div class="stat-value">{{ stats.posted }}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Erros</div>
-                <div class="stat-value">{{ stats.errors }}</div>
-            </div>
-        </div>
+<div class="container">
+    <h1>🚀 AutoPost</h1>
+    <p>Controle Remoto do LinkedIn Bot</p>
 
-        <!-- POSTS TABLE -->
-        <div class="section-header">
-            <div class="section-title">📋 Fila de Publicações</div>
-        </div>
+    <button id="postBtn" class="btn-post">Publicar Agora</button>
 
-        <div class="table-wrapper">
-            {% if posts %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Tema</th>
-                        <th>Texto</th>
-                        <th>Status</th>
-                        <th>Criado em</th>
-                        <th>Ação</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for post in posts %}
-                    <tr>
-                        <td style="font-weight: 600; color: var(--accent-blue);">#{{ post.id }}</td>
-                        <td>
-                            <div class="post-topic">{{ post.topic or '—' }}</div>
-                        </td>
-                        <td>
-                            <div class="post-text" title="{{ post.text }}">{{ post.text[:80] }}...</div>
-                        </td>
-                        <td>
-                            {% if post.status == 'pending' %}
-                                <span class="badge badge-pending">⏳ Pendente</span>
-                            {% elif post.status == 'posted' %}
-                                <span class="badge badge-posted">✅ Publicado</span>
-                            {% else %}
-                                <span class="badge badge-error">❌ Erro</span>
-                            {% endif %}
-                        </td>
-                        <td style="color: var(--text-secondary); font-size: 0.82rem;">{{ post.created_at or '—' }}</td>
-                        <td>
-                            <form method="POST" action="/api/delete/{{ post.id }}" style="display:inline;" onsubmit="return confirm('Tem certeza?')">
-                                <button type="submit" class="btn-delete">🗑 Remover</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div class="empty-state">
-                <div class="icon">📭</div>
-                <p>Nenhum post na fila ainda.</p>
-                <p style="margin-top: 0.5rem; font-size: 0.82rem;">
-                    Execute <code style="background: var(--glass); padding: 2px 8px; border-radius: 4px;">python -m content_creator.main "seu tema"</code> para gerar conteúdo.
-                </p>
-            </div>
-            {% endif %}
-        </div>
-
-        <!-- FOOTER -->
-        <div class="footer">
-            <p>LinkedIn Bot v1.0 — Criado com 🧠 IA + Python + Flask</p>
-        </div>
+    <div class="status-feed" id="feed">
+        <div style="text-align:center">Carregando comandos...</div>
     </div>
+</div>
+
+<script>
+    // --- CONFIGURAÇÃO (O Antigravity preencheu para você) ---
+    const SUPABASE_URL = "https://pumqpplzflfzknqqrkdy.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_eChooowGIuw8JwllkoU4kw_4FSYYJku";
+    
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const postBtn = document.getElementById('postBtn');
+    const feed = document.getElementById('feed');
+
+    // Função para enviar o comando
+    postBtn.onclick = async () => {
+        postBtn.disabled = true;
+        postBtn.innerText = "Enviando sinal...";
+
+        const { error } = await supabase
+            .from('automation_commands')
+            .insert([{ command: 'post_now', status: 'pending' }]);
+
+        if (error) alert("Erro ao enviar: " + error.message);
+        else {
+            setTimeout(() => {
+                postBtn.disabled = false;
+                postBtn.innerText = "Publicar Agora";
+            }, 2000);
+        }
+    };
+
+    // Função para buscar e mostrar o histórico
+    async function updateFeed() {
+        const { data, error } = await supabase
+            .from('automation_commands')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+        if (data) {
+            feed.innerHTML = data.map(item => `
+                <div class="status-item">
+                    <span>${item.command}</span>
+                    <span class="status-badge ${item.status}">${item.status.toUpperCase()}</span>
+                </div>
+            `).join('') || "Sem comandos recentes.";
+        }
+    }
+
+    // Atualiza a cada 5 segundos
+    setInterval(updateFeed, 5000);
+    updateFeed();
+</script>
+
 </body>
 </html>

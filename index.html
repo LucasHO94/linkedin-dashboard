@@ -3,112 +3,228 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AutoPost — Controle Remoto</title>
+    <title>LinkedIn Bot — Cloud Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --primary: #0077b5; --bg: #0f172a; --card: #1e293b; --text: #f8fafc;
+            --bg: #0f172a; --card: #1e293b; --primary: #0077b5;
+            --success: #10b981; --warning: #f59e0b; --danger: #ef4444;
+            --text: #f1f5f9; --text-dim: #94a3b8;
         }
         body {
             font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text);
-            display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;
+            margin: 0; padding: 20px; line-height: 1.5; min-height: 100vh;
         }
-        .container {
-            background: var(--card); padding: 2rem; border-radius: 24px; width: 90%; max-width: 400px;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        h1 { font-weight: 600; margin-bottom: 0.5rem; color: var(--primary); }
-        p { opacity: 0.7; font-size: 0.9rem; margin-bottom: 2rem; }
+        .container { max-width: 1000px; margin: 0 auto; }
         
-        .btn-post {
-            background: linear-gradient(135deg, #0077b5 0%, #00a0dc 100%);
-            color: white; border: none; padding: 1.2rem 2rem; border-radius: 16px;
-            font-size: 1.1rem; font-weight: 600; cursor: pointer; width: 100%;
-            box-shadow: 0 10px 15px -3px rgba(0,119,181,0.4);
-            transition: all 0.3s ease;
+        /* Header */
+        header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 30px; padding: 0 10px;
         }
-        .btn-post:active { transform: scale(0.95); }
-        .btn-post:disabled { opacity: 0.5; cursor: not-allowed; }
+        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo-icon { 
+            background: linear-gradient(135deg, var(--primary), #00a0dc);
+            width: 45px; height: 45px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+        }
+        .status-badge {
+            background: rgba(16, 185, 129, 0.1); color: var(--success);
+            padding: 6px 14px; border-radius: 20px; font-size: 0.8rem;
+            border: 1px solid rgba(16, 185, 129, 0.2); display: flex; align-items: center; gap: 6px;
+        }
 
-        .status-feed {
-            margin-top: 2rem; text-align: left; background: rgba(0,0,0,0.2);
-            padding: 1rem; border-radius: 12px; font-size: 0.8rem;
+        /* Stats Grid */
+        .stats-grid { 
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 20px; margin-bottom: 30px;
         }
-        .status-item { 
-            display: flex; justify-content: space-between; padding: 0.5rem 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+        .stat-card {
+            background: var(--card); padding: 20px; border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.05); position: relative; overflow: hidden;
         }
-        .status-badge { 
-            padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;
+        .stat-card::before {
+            content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
         }
-        .pending { background: #ca8a04; color: #fff; }
-        .done { background: #16a34a; color: #fff; }
+        .stat-card.total::before { background: var(--primary); }
+        .stat-card.pending::before { background: var(--warning); }
+        .stat-card.posted::before { background: var(--success); }
+        .stat-card.errors::before { background: var(--danger); }
+        
+        .stat-label { font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 2rem; font-weight: 600; margin: 5px 0; }
+
+        /* Action Center */
+        .action-center {
+            background: var(--card); padding: 30px; border-radius: 24px;
+            margin-bottom: 30px; text-align: center; border: 1px solid rgba(255,255,255,0.05);
+            background: linear-gradient(180deg, var(--card) 0%, rgba(30, 41, 59, 0.5) 100%);
+        }
+        .btn-post {
+            background: linear-gradient(135deg, var(--primary) 0%, #00a0dc 100%);
+            color: white; border: none; padding: 15px 40px; border-radius: 14px;
+            font-size: 1.1rem; font-weight: 600; cursor: pointer;
+            box-shadow: 0 10px 25px -5px rgba(0, 119, 181, 0.4); transition: 0.3s;
+            display: inline-flex; align-items: center; gap: 10px;
+        }
+        .btn-post:hover { transform: translateY(-3px); box-shadow: 0 15px 30px -5px rgba(0, 119, 181, 0.6); }
+        .btn-post:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* Table */
+        .section-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .table-container { 
+            background: var(--card); border-radius: 20px; overflow: hidden; 
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: rgba(0,0,0,0.2); padding: 15px; text-align: left; font-size: 0.8rem; color: var(--text-dim); }
+        td { padding: 15px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
+        
+        .badge { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
+        .badge.pending { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+        .badge.posted { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .badge.error { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+
+        @media (max-width: 600px) {
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            th:nth-child(3), td:nth-child(3) { display: none; }
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🚀 AutoPost</h1>
-    <p>Controle Remoto do LinkedIn Bot</p>
+    <header>
+        <div class="logo">
+            <div class="logo-icon"><i class="fa-solid fa-robot"></i></div>
+            <div>
+                <h1 style="margin:0; font-size: 1.4rem;">LinkedIn Bot</h1>
+                <span style="font-size: 0.8rem; color: var(--text-dim);">Controle Remoto Cloud</span>
+            </div>
+        </div>
+        <div class="status-badge">
+            <i class="fa-solid fa-circle" style="font-size: 0.5rem;"></i> Sistema Online
+        </div>
+    </header>
 
-    <button id="postBtn" class="btn-post">Publicar Agora</button>
+    <div class="stats-grid">
+        <div class="stat-card total">
+            <div class="stat-label">Total GERAL</div>
+            <div class="stat-value" id="stat-total">0</div>
+        </div>
+        <div class="stat-card pending">
+            <div class="stat-label">NA FILA</div>
+            <div class="stat-value" id="stat-pending">0</div>
+        </div>
+        <div class="stat-card posted">
+            <div class="stat-label">PUBLICADOS</div>
+            <div class="stat-value" id="stat-posted">0</div>
+        </div>
+        <div class="stat-card errors">
+            <div class="stat-label">ERROS</div>
+            <div class="stat-value" id="stat-errors">0</div>
+        </div>
+    </div>
 
-    <div class="status-feed" id="feed">
-        <div style="text-align:center">Carregando comandos...</div>
+    <div class="action-center">
+        <h2 style="margin-top:0">Ações Rápidas</h2>
+        <p style="color: var(--text-dim); margin-bottom: 25px;">Acione o robô no seu notebook de qualquer lugar.</p>
+        <button id="postBtn" class="btn-post">
+            <i class="fa-solid fa-paper-plane"></i> Publicar Agora
+        </button>
+    </div>
+
+    <div class="section-title">
+        <i class="fa-solid fa-list-ul"></i> Fila de Publicações
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>TEMA / TÓPICO</th>
+                    <th>STATUS</th>
+                    <th>CRIADO EM</th>
+                </tr>
+            </thead>
+            <tbody id="posts-body">
+                <tr><td colspan="3" style="text-align:center; padding: 40px; color: var(--text-dim);">Carregando fila de dados...</td></tr>
+            </tbody>
+        </table>
     </div>
 </div>
 
 <script>
-    // --- CONFIGURAÇÃO (O Antigravity preencheu para você) ---
+    // --- CONFIGURAÇÃO SUPABASE ---
     const SUPABASE_URL = "https://pumqpplzflfzknqqrkdy.supabase.co";
     const SUPABASE_KEY = "sb_publishable_eChooowGIuw8JwllkoU4kw_4FSYYJku";
     
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const postBtn = document.getElementById('postBtn');
-    const feed = document.getElementById('feed');
 
-    // Função para enviar o comando
+    // Função para enviar comando
     postBtn.onclick = async () => {
         postBtn.disabled = true;
-        postBtn.innerText = "Enviando sinal...";
+        postBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
 
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('automation_commands')
             .insert([{ command: 'post_now', status: 'pending' }]);
 
-        if (error) alert("Erro ao enviar: " + error.message);
-        else {
+        if (error) {
+            alert("Erro: " + error.message);
+            postBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Tentar Novamente';
+            postBtn.disabled = false;
+        } else {
             setTimeout(() => {
-                postBtn.disabled = false;
-                postBtn.innerText = "Publicar Agora";
-            }, 2000);
+                postBtn.innerHTML = '<i class="fa-solid fa-check"></i> Enviado com Sucesso!';
+                setTimeout(() => {
+                    postBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Publicar Agora';
+                    postBtn.disabled = false;
+                }, 3000);
+            }, 1000);
         }
     };
 
-    // Função para buscar e mostrar o histórico
-    async function updateFeed() {
-        const { data, error } = await supabase
-            .from('automation_commands')
+    // Função para buscar dados
+    async function refreshData() {
+        // Buscar Estatísticas
+        const { data: posts } = await supabaseClient.from('posts_queue').select('status');
+        if (posts) {
+            document.getElementById('stat-total').innerText = posts.length;
+            document.getElementById('stat-pending').innerText = posts.filter(p => p.status === 'pending').length;
+            document.getElementById('stat-posted').innerText = posts.filter(p => p.status === 'posted').length;
+            document.getElementById('stat-errors').innerText = posts.filter(p => p.status === 'error').length;
+        }
+
+        // Buscar Tabela (Últimos 10)
+        const { data: queue } = await supabaseClient
+            .from('posts_queue')
             .select('*')
             .order('created_at', { ascending: false })
-            .limit(5);
+            .limit(10);
 
-        if (data) {
-            feed.innerHTML = data.map(item => `
-                <div class="status-item">
-                    <span>${item.command}</span>
-                    <span class="status-badge ${item.status}">${item.status.toUpperCase()}</span>
-                </div>
-            `).join('') || "Sem comandos recentes.";
+        if (queue) {
+            const body = document.getElementById('posts-body');
+            if (queue.length === 0) {
+                body.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 20px;">Nenhum post na fila ainda.</td></tr>';
+            } else {
+                body.innerHTML = queue.map(p => `
+                    <tr>
+                        <td><strong>${p.topic || 'Sem tema'}</strong></td>
+                        <td><span class="badge ${p.status}">${p.status.toUpperCase()}</span></td>
+                        <td style="color:var(--text-dim)">${new Date(p.created_at).toLocaleDateString()}</td>
+                    </tr>
+                `).join('');
+            }
         }
     }
 
-    // Atualiza a cada 5 segundos
-    setInterval(updateFeed, 5000);
-    updateFeed();
+    // Auto-refresh
+    setInterval(refreshData, 10000);
+    refreshData();
 </script>
 
 </body>

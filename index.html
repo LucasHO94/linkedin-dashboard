@@ -323,7 +323,7 @@
                 </div>
             </div>
             <div class="system-status">
-                <div class="dot" id="pulsating-dot"></div> Conexão Supabase Ativa
+                <div class="dot" id="status-indicator"></div> <span id="status-text">Verificando Robô...</span>
             </div>
         </header>
 
@@ -367,6 +367,13 @@
                 </thead>
                 <tbody id="posts-body"></tbody>
             </table>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; margin-top: 50px; margin-bottom: 20px;">
+            <i class="fa-solid fa-terminal" style="color: var(--text-low);"></i>
+            <h2 style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px; color: var(--text-low);">Atividade em Tempo Real</h2>
+        </div>
+        <div id="log-console" style="background: #000; border-radius: 20px; padding: 25px; font-family: monospace; font-size: 0.85rem; border: 1px solid var(--glass-border); min-height: 120px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); overflow-y: auto;">
+            <div style="color: var(--text-low);">Conectando à central de logs...</div>
         </div>
     </div>
 
@@ -414,6 +421,7 @@
         }
 
         async function refreshData() {
+            // 1. Atualizar contadores e posts
             const { data: posts } = await supabaseClient.from('posts_queue').select('*').order('created_at', { ascending: false }).limit(20);
             if (posts) {
                 allPosts = posts;
@@ -438,6 +446,36 @@
                     </td>
                 </tr>
             `).join('');
+            }
+
+            // 2. Atualizar Console de Atividade
+            const { data: logs } = await supabaseClient.from('automation_logs').select('*').order('created_at', { ascending: false }).limit(5);
+            if (logs) {
+                document.getElementById('log-console').innerHTML = logs.map(l => `
+                    <div style="margin-bottom: 5px;">
+                        <span style="color: var(--text-low); font-size: 0.7rem;">[${new Date(l.created_at).toLocaleTimeString()}]</span> 
+                        <span style="color: ${l.type === 'error' ? 'var(--danger)' : l.type === 'success' ? 'var(--success)' : '#fff'}">${l.message}</span>
+                    </div>
+                `).join('') || '<div style="color: var(--text-low)">Aguardando atividade...</div>';
+            }
+
+            // 3. Verificar Status do Robô (Heartbeat)
+            const { data: settings } = await supabaseClient.from('automation_settings').select('last_seen').eq('id', 'robot_heartbeat').single();
+            if (settings) {
+                const lastSeen = new Date(settings.last_seen);
+                const diffSecs = (new Date() - lastSeen) / 1000;
+                const statusDot = document.getElementById('status-indicator');
+                const statusText = document.getElementById('status-text');
+                
+                if (diffSecs < 60) {
+                    statusDot.style.background = 'var(--success)';
+                    statusDot.style.boxShadow = '0 0 10px var(--success)';
+                    statusText.innerText = 'Robô Online e Ativo';
+                } else {
+                    statusDot.style.background = 'var(--danger)';
+                    statusDot.style.boxShadow = '0 0 10px var(--danger)';
+                    statusText.innerText = 'Robô Offline';
+                }
             }
         }
 

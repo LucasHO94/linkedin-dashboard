@@ -386,16 +386,22 @@
         const generateBtn = document.getElementById('generateBtn');
 
         generateBtn.onclick = async () => {
-            generateBtn.disabled = true;
-            const originalContent = generateBtn.innerHTML;
-            generateBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ORQUESTRANDO...';
+            try {
+                generateBtn.disabled = true;
+                const originalContent = generateBtn.innerHTML;
+                generateBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ORQUESTRANDO...';
 
-            await supabaseClient.from('automation_commands').insert([{ command: 'generate_post', status: 'pending' }]);
+                await supabaseClient.from('automation_commands').insert([{ command: 'generate_post', status: 'pending' }]);
 
-            setTimeout(() => {
+                setTimeout(() => {
+                    generateBtn.disabled = false;
+                    generateBtn.innerHTML = originalContent;
+                }, 5000);
+            } catch (err) {
+                console.error("Erro ao enviar comando:", err);
+                alert("Falha ao conectar com o Supabase. Verifique sua conexão.");
                 generateBtn.disabled = false;
-                generateBtn.innerHTML = originalContent;
-            }, 5000);
+            }
         };
 
         function showPost(id) {
@@ -410,78 +416,119 @@
 
         async function publishPost(id) {
             if (!confirm("Confirmar publicação imediata no LinkedIn?")) return;
-            await supabaseClient.from('automation_commands').insert([{ command: `publish_post:${id}`, status: 'pending' }]);
-            alert("Comando enviado com sucesso para o notebook.");
+            try {
+                await supabaseClient.from('automation_commands').insert([{ command: `publish_post:${id}`, status: 'pending' }]);
+                alert("Comando de publicação enviado com sucesso.");
+            } catch (err) {
+                alert("Erro ao enviar comando de publicação.");
+            }
         }
 
         async function deletePost(id) {
             if (!confirm("Deseja excluir este rascunho?")) return;
-            await supabaseClient.from('posts_queue').delete().eq('id', id);
-            refreshData();
+            try {
+                await supabaseClient.from('posts_queue').delete().eq('id', id);
+                refreshData();
+            } catch (err) {
+                alert("Erro ao excluir post.");
+            }
         }
 
         async function refreshData() {
-            // 1. Atualizar contadores e posts
-            const { data: posts } = await supabaseClient.from('posts_queue').select('*').order('created_at', { ascending: false }).limit(20);
-            if (posts) {
-                allPosts = posts;
-                document.getElementById('stat-pending').innerText = posts.filter(p => p.status === 'pending').length;
-                document.getElementById('stat-posted').innerText = posts.filter(p => p.status === 'posted').length;
+            try {
+                // 1. Atualizar contadores e posts
+                const { data: posts, error: postsError } = await supabaseClient.from('posts_queue').select('*').order('created_at', { ascending: false }).limit(20);
+                
+                if (postsError) throw postsError;
 
-                document.getElementById('posts-body').innerHTML = posts.map(p => `
-                <tr>
-                    <td class="topic-cell">
-                        <div>${p.topic || 'Sem Assunto'}</div>
-                        <div class="time-cell">${new Date(p.created_at).toLocaleString('pt-BR')}</div>
-                    </td>
-                    <td><span class="status-pill pill-${p.status}">${p.status === 'pending' ? 'PENDENTE' : p.status === 'posted' ? 'POSTADO' : 'ERRO'}</span></td>
-                    <td>
-                        <div class="action-btns">
-                            <button class="btn-icon" onclick="showPost(${p.id})" title="Ver Rascunho"><i class="fa-solid fa-eye"></i></button>
-                            ${p.status === 'pending' ? `
-                                <button class="btn-icon go" onclick="publishPost(${p.id})" title="Publicar Agora"><i class="fa-solid fa-paper-plane"></i></button>
-                            ` : ''}
-                            <button class="btn-icon del" onclick="deletePost(${p.id})" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
+                if (posts) {
+                    allPosts = posts;
+                    document.getElementById('stat-pending').innerText = posts.filter(p => p.status === 'pending').length;
+                    document.getElementById('stat-posted').innerText = posts.filter(p => p.status === 'posted').length;
+
+                    document.getElementById('posts-body').innerHTML = posts.map(p => `
+                    <tr>
+                        <td class="topic-cell">
+                            <div>${p.topic || 'Sem Assunto'}</div>
+                            <div class="time-cell">${new Date(p.created_at).toLocaleString('pt-BR')}</div>
+                        </td>
+                        <td><span class="status-pill pill-${p.status || 'pending'}">${p.status === 'pending' ? 'PENDENTE' : p.status === 'posted' ? 'POSTADO' : 'ERRO'}</span></td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn-icon" onclick="showPost(${p.id})" title="Ver Rascunho"><i class="fa-solid fa-eye"></i></button>
+                                ${p.status === 'pending' ? `
+                                    <button class="btn-icon go" onclick="publishPost(${p.id})" title="Publicar Agora"><i class="fa-solid fa-paper-plane"></i></button>
+                                ` : ''}
+                                <button class="btn-icon del" onclick="deletePost(${p.id})" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+                }
+
+                // 2. Atualizar Console de Atividade
+                const { data: logs, error: logsError } = await supabaseClient.from('automation_logs').select('*').order('created_at', { ascending: false }).limit(15);
+                
+                if (logsError) throw logsError;
+
+                if (logs) {
+                    const consoleEl = document.getElementById('log-console');
+                    const isAtBottom = consoleEl.scrollHeight - consoleEl.clientHeight <= consoleEl.scrollTop + 1;
+
+                    // Invertemos para mostrar as mais recentes embaixo (comportamento de terminal)
+                    const sortedLogs = [...logs].reverse();
+                    
+                    consoleEl.innerHTML = sortedLogs.map(l => `
+                        <div style="margin-bottom: 5px; border-left: 2px solid ${l.type === 'error' ? 'var(--danger)' : l.type === 'success' ? 'var(--success)' : 'transparent'}; padding-left: 10px;">
+                            <span style="color: var(--text-low); font-size: 0.7rem;">[${new Date(l.created_at).toLocaleTimeString()}]</span> 
+                            <span style="color: ${l.type === 'error' ? 'var(--danger)' : l.type === 'success' ? 'var(--success)' : '#fff'}">${l.message}</span>
                         </div>
-                    </td>
-                </tr>
-            `).join('');
-            }
+                    `).join('') || '<div style="color: var(--text-low)">Aguardando atividade...</div>';
 
-            // 2. Atualizar Console de Atividade
-            const { data: logs } = await supabaseClient.from('automation_logs').select('*').order('created_at', { ascending: false }).limit(5);
-            if (logs) {
-                document.getElementById('log-console').innerHTML = logs.map(l => `
-                    <div style="margin-bottom: 5px;">
-                        <span style="color: var(--text-low); font-size: 0.7rem;">[${new Date(l.created_at).toLocaleTimeString()}]</span> 
-                        <span style="color: ${l.type === 'error' ? 'var(--danger)' : l.type === 'success' ? 'var(--success)' : '#fff'}">${l.message}</span>
-                    </div>
-                `).join('') || '<div style="color: var(--text-low)">Aguardando atividade...</div>';
-            }
+                    // Auto-scroll se o usuário não subiu manualmente
+                    if (isAtBottom) {
+                        consoleEl.scrollTop = consoleEl.scrollHeight;
+                    }
+                }
 
-            // 3. Verificar Status do Robô (Heartbeat)
-            const { data: settings } = await supabaseClient.from('automation_settings').select('last_seen').eq('id', 'robot_heartbeat').single();
-            if (settings) {
-                const lastSeen = new Date(settings.last_seen);
-                const diffSecs = (new Date() - lastSeen) / 1000;
+                // 3. Verificar Status do Robô (Heartbeat)
+                const { data: settings, error: settingsError } = await supabaseClient.from('automation_settings').select('last_seen').eq('id', 'robot_heartbeat').maybeSingle();
+                
+                if (settingsError) throw settingsError;
+
                 const statusDot = document.getElementById('status-indicator');
                 const statusText = document.getElementById('status-text');
-                
-                if (diffSecs < 60) {
-                    statusDot.style.background = 'var(--success)';
-                    statusDot.style.boxShadow = '0 0 10px var(--success)';
-                    statusText.innerText = 'Robô Online e Ativo';
+
+                if (settings) {
+                    const lastSeen = new Date(settings.last_seen);
+                    const diffSecs = (new Date() - lastSeen) / 1000;
+                    
+                    if (diffSecs < 60) {
+                        statusDot.style.background = 'var(--success)';
+                        statusDot.style.boxShadow = '0 0 10px var(--success)';
+                        statusText.innerText = 'Robô Online e Ativo';
+                    } else {
+                        statusDot.style.background = 'var(--danger)';
+                        statusDot.style.boxShadow = '0 0 10px var(--danger)';
+                        statusText.innerText = 'Robô Offline';
+                    }
                 } else {
-                    statusDot.style.background = 'var(--danger)';
-                    statusDot.style.boxShadow = '0 0 10px var(--danger)';
-                    statusText.innerText = 'Robô Offline';
+                    statusDot.style.background = 'var(--warning)';
+                    statusText.innerText = 'Status Desconhecido';
                 }
+
+            } catch (err) {
+                console.error("Erro na atualização em tempo real:", err);
+                const statusText = document.getElementById('status-text');
+                if (statusText) statusText.innerText = 'Erro de Conexão';
             }
         }
 
+        // Frequência de atualização (5 segundos)
         setInterval(refreshData, 5000);
         refreshData();
     </script>
+
 </body>
 
 </html>

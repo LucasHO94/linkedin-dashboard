@@ -424,6 +424,17 @@
             }
         }
 
+        async function retryPost(id) {
+            try {
+                // Seta o status de volta para pending para aparecer o botão de avião
+                await supabaseClient.from('posts_queue').update({ status: 'pending', error_log: null }).eq('id', id);
+                refreshData();
+                alert("Post restaurado para PENDENTE. Clique no avião para tentar postar novamente.");
+            } catch (err) {
+                alert("Erro ao restaurar post.");
+            }
+        }
+
         async function deletePost(id) {
             if (!confirm("Deseja excluir este rascunho?")) return;
             try {
@@ -455,9 +466,11 @@
                         <td><span class="status-pill pill-${p.status || 'pending'}">${p.status === 'pending' ? 'PENDENTE' : p.status === 'posted' ? 'POSTADO' : 'ERRO'}</span></td>
                         <td>
                             <div class="action-btns">
-                                <button class="btn-icon" onclick="showPost(${p.id})" title="Ver Rascunho"><i class="fa-solid fa-eye"></i></button>
+                                    <button class="btn-icon" onclick="showPost(${p.id})" title="Ver Rascunho"><i class="fa-solid fa-eye"></i></button>
                                 ${p.status === 'pending' ? `
                                     <button class="btn-icon go" onclick="publishPost(${p.id})" title="Publicar Agora"><i class="fa-solid fa-paper-plane"></i></button>
+                                ` : p.status === 'error' ? `
+                                    <button class="btn-icon go" onclick="retryPost(${p.id})" title="Tentar Novamente" style="background: var(--warning); border-color: var(--warning);"><i class="fa-solid fa-rotate-right"></i></button>
                                 ` : ''}
                                 <button class="btn-icon del" onclick="deletePost(${p.id})" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
                             </div>

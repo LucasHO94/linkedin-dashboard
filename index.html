@@ -332,9 +332,14 @@
                 <h2 style="margin-bottom: 12px; font-weight: 400;">Orquestrador de Conteúdo</h2>
                 <p style="color: var(--text-low); margin-bottom: 30px; font-size: 0.9rem;">Analise o feed, detecte
                     tendências e gere posts de alto impacto.</p>
-                <button id="generateBtn" class="btn-main">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> GERAR NOVA SUGESTÃO
-                </button>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;">
+                    <button id="pipelineBtn" class="btn-main" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 10px 40px -10px #059669;">
+                        <i class="fa-solid fa-rocket"></i> PIPELINE COMPLETO
+                    </button>
+                    <button id="generateBtn" class="btn-main" style="background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%); padding: 14px 30px; font-size: 0.95rem;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> GERAR RASCUNHO
+                    </button>
+                </div>
             </div>
             <div class="card">
                 <div class="stat-icon" style="color: var(--warning);"><i class="fa-solid fa-clock-rotate-left"></i>
@@ -384,12 +389,38 @@
 
         let allPosts = [];
         const generateBtn = document.getElementById('generateBtn');
+        const pipelineBtn = document.getElementById('pipelineBtn');
 
+        // Botão: Pipeline Completo (Tendência → Conteúdo → Postagem)
+        pipelineBtn.onclick = async () => {
+            try {
+                if (!confirm('Iniciar Pipeline Completo?\n\nIsso vai:\n1. Analisar tendências do seu feed\n2. Gerar texto + imagem\n3. Publicar automaticamente no LinkedIn\n\nDeseja continuar?')) return;
+                pipelineBtn.disabled = true;
+                generateBtn.disabled = true;
+                const originalContent = pipelineBtn.innerHTML;
+                pipelineBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> EXECUTANDO PIPELINE...';
+
+                await supabaseClient.from('automation_commands').insert([{ command: 'full_pipeline', status: 'pending' }]);
+
+                setTimeout(() => {
+                    pipelineBtn.disabled = false;
+                    generateBtn.disabled = false;
+                    pipelineBtn.innerHTML = originalContent;
+                }, 10000);
+            } catch (err) {
+                console.error("Erro ao enviar comando:", err);
+                alert("Falha ao conectar com o Supabase. Verifique sua conexão.");
+                pipelineBtn.disabled = false;
+                generateBtn.disabled = false;
+            }
+        };
+
+        // Botão: Gerar apenas rascunho (sem postar)
         generateBtn.onclick = async () => {
             try {
                 generateBtn.disabled = true;
                 const originalContent = generateBtn.innerHTML;
-                generateBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ORQUESTRANDO...';
+                generateBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> GERANDO...';
 
                 await supabaseClient.from('automation_commands').insert([{ command: 'generate_post', status: 'pending' }]);
 
@@ -426,12 +457,41 @@
 
         async function retryPost(id) {
             try {
-                // Seta o status de volta para pending para aparecer o botão de avião
-                await supabaseClient.from('posts_queue').update({ status: 'pending', error_log: null }).eq('id', id);
-                refreshData();
-                alert("Post restaurado para PENDENTE. Clique no avião para tentar postar novamente.");
+                console.log("Tentando restaurar post ID:", id);
+                
+                // Approach 1: Tenta update direto (pode falhar por RLS)
+                const { data, error } = await supabaseClient
+                    .from('posts_queue')
+                    .update({ status: 'pending', error_message: null })
+                    .eq('id', id)
+                    .select();
+
+                if (error) {
+                    console.warn("Update direto falhou (RLS?):", error.message);
+                }
+                
+                const directSuccess = data && data.length > 0;
+                
+                if (!directSuccess) {
+                    // Approach 2: Envia comando via automation_commands (o bridge processa com secret key)
+                    console.log("Enviando comando retry via automation_commands...");
+                    const { error: cmdError } = await supabaseClient
+                        .from('automation_commands')
+                        .insert([{ command: `retry_post:${id}`, status: 'pending' }]);
+                    
+                    if (cmdError) throw cmdError;
+                }
+
+                await refreshData();
+                
+                if (directSuccess) {
+                    alert("Post restaurado para PENDENTE. Clique no avião para publicar.");
+                } else {
+                    alert("Comando de retry enviado ao robô. Quando o robô processar, o status será atualizado.");
+                }
             } catch (err) {
-                alert("Erro ao restaurar post.");
+                console.error("Erro Supabase:", err);
+                alert("Erro ao restaurar: " + (err.message || "Verifique as permissões SQL"));
             }
         }
 

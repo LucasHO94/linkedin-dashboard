@@ -296,6 +296,66 @@
                 grid-column: span 1;
             }
         }
+
+        /* ---- Botões de controle (Pausar / Modo Técnico) ---- */
+        .control-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 22px;
+            padding-top: 20px;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .btn-toggle {
+            padding: 10px 22px;
+            border-radius: 12px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid;
+            transition: all 0.25s ease;
+            letter-spacing: 0.02em;
+            font-family: 'Outfit', sans-serif;
+        }
+        .btn-toggle:active { transform: scale(0.96); }
+        .btn-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-toggle-pause {
+            background: rgba(251,191,36,0.1);
+            color: #fbbf24;
+            border-color: rgba(251,191,36,0.25);
+        }
+        .btn-toggle-pause:hover:not(:disabled) { background: rgba(251,191,36,0.2); }
+        .btn-toggle-pause.is-paused {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: #000;
+            border-color: #fbbf24;
+            box-shadow: 0 6px 28px -6px #f59e0b;
+            animation: pulse-amber 2s infinite;
+        }
+
+        .btn-toggle-tech {
+            background: rgba(139,92,246,0.1);
+            color: #a78bfa;
+            border-color: rgba(139,92,246,0.25);
+        }
+        .btn-toggle-tech:hover:not(:disabled) { background: rgba(139,92,246,0.2); }
+        .btn-toggle-tech.is-active {
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+            color: #fff;
+            border-color: #8b5cf6;
+            box-shadow: 0 6px 28px -6px #8b5cf6;
+        }
+
+        @keyframes pulse-amber {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.65; }
+        }
     </style>
 </head>
 
@@ -338,6 +398,18 @@
                     </button>
                     <button id="generateBtn" class="btn-main" style="background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%); padding: 14px 30px; font-size: 0.95rem;">
                         <i class="fa-solid fa-wand-magic-sparkles"></i> GERAR RASCUNHO
+                    </button>
+                </div>
+
+                <!-- Controles secundários -->
+                <div class="control-row">
+                    <button id="pauseBtn" class="btn-toggle btn-toggle-pause" onclick="togglePause()">
+                        <i class="fa-solid fa-pause" id="pauseIcon"></i>
+                        <span id="pauseLabel">PAUSAR BOT</span>
+                    </button>
+                    <button id="techBtn" class="btn-toggle btn-toggle-tech" onclick="toggleTechnicalMode()">
+                        <i class="fa-solid fa-flask"></i>
+                        <span id="techLabel">MODO TÉCNICO</span>
                     </button>
                 </div>
             </div>
@@ -388,8 +460,88 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let allPosts = [];
+        let botPaused = false;
+        let technicalMode = false;
+
         const generateBtn = document.getElementById('generateBtn');
         const pipelineBtn = document.getElementById('pipelineBtn');
+
+        // --- Funções de controle ---
+
+        function updateControlButtons() {
+            const pauseBtn = document.getElementById('pauseBtn');
+            const pauseIcon = document.getElementById('pauseIcon');
+            const pauseLabel = document.getElementById('pauseLabel');
+            if (botPaused) {
+                pauseBtn.classList.add('is-paused');
+                pauseIcon.className = 'fa-solid fa-play';
+                pauseLabel.textContent = 'RETOMAR BOT';
+            } else {
+                pauseBtn.classList.remove('is-paused');
+                pauseIcon.className = 'fa-solid fa-pause';
+                pauseLabel.textContent = 'PAUSAR BOT';
+            }
+
+            const techBtn = document.getElementById('techBtn');
+            const techLabel = document.getElementById('techLabel');
+            if (technicalMode) {
+                techBtn.classList.add('is-active');
+                techLabel.textContent = 'TÉCNICO ATIVO';
+            } else {
+                techBtn.classList.remove('is-active');
+                techLabel.textContent = 'MODO TÉCNICO';
+            }
+        }
+
+        async function togglePause() {
+            const pauseBtn = document.getElementById('pauseBtn');
+            pauseBtn.disabled = true;
+            const newPaused = !botPaused;
+            try {
+                const { error } = await supabaseClient
+                    .from('automation_settings')
+                    .upsert([{ id: 'bot_paused', last_seen: String(newPaused) }]);
+                if (error) throw error;
+                botPaused = newPaused;
+                updateControlButtons();
+                await supabaseClient.from('automation_logs').insert([{
+                    message: newPaused
+                        ? '⏸️ Automação pausada pelo dashboard.'
+                        : '▶️ Automação retomada pelo dashboard.',
+                    type: 'system',
+                    created_at: new Date().toISOString()
+                }]);
+            } catch (err) {
+                console.error("Erro ao alternar pausa:", err);
+                alert('Erro ao alterar estado: ' + (err.message || err));
+            }
+            pauseBtn.disabled = false;
+        }
+
+        async function toggleTechnicalMode() {
+            const techBtn = document.getElementById('techBtn');
+            techBtn.disabled = true;
+            const newMode = !technicalMode;
+            try {
+                const { error } = await supabaseClient
+                    .from('automation_settings')
+                    .upsert([{ id: 'technical_mode', last_seen: String(newMode) }]);
+                if (error) throw error;
+                technicalMode = newMode;
+                updateControlButtons();
+                await supabaseClient.from('automation_logs').insert([{
+                    message: newMode
+                        ? '🔬 Modo Técnico ativado — próximos posts como case study.'
+                        : '📝 Modo padrão ativado — posts conversacionais.',
+                    type: 'system',
+                    created_at: new Date().toISOString()
+                }]);
+            } catch (err) {
+                console.error("Erro ao alternar modo técnico:", err);
+                alert('Erro ao alterar modo: ' + (err.message || err));
+            }
+            techBtn.disabled = false;
+        }
 
         // Botão: Pipeline Completo (Tendência → Conteúdo → Postagem)
         pipelineBtn.onclick = async () => {
@@ -564,18 +716,28 @@
                     }
                 }
 
-                // 3. Verificar Status do Robô (Heartbeat)
-                const { data: settings, error: settingsError } = await supabaseClient.from('automation_settings').select('last_seen').eq('id', 'robot_heartbeat').maybeSingle();
-                
-                if (settingsError) throw settingsError;
+                // 3. Verificar Status do Robô + Configurações (em paralelo)
+                const [heartbeatRes, pausedRes, techRes] = await Promise.all([
+                    supabaseClient.from('automation_settings').select('last_seen').eq('id', 'robot_heartbeat').maybeSingle(),
+                    supabaseClient.from('automation_settings').select('last_seen').eq('id', 'bot_paused').maybeSingle(),
+                    supabaseClient.from('automation_settings').select('last_seen').eq('id', 'technical_mode').maybeSingle()
+                ]);
 
+                // Atualiza estado dos botões de controle
+                botPaused = pausedRes.data?.last_seen === 'true';
+                technicalMode = techRes.data?.last_seen === 'true';
+                updateControlButtons();
+
+                // Atualiza badge de status no header
                 const statusDot = document.getElementById('status-indicator');
                 const statusText = document.getElementById('status-text');
 
-                if (settings) {
-                    const lastSeen = new Date(settings.last_seen);
-                    const diffSecs = (new Date() - lastSeen) / 1000;
-                    
+                if (botPaused) {
+                    statusDot.style.background = '#fbbf24';
+                    statusDot.style.boxShadow = '0 0 10px #fbbf24';
+                    statusText.innerText = '⏸ Bot Pausado';
+                } else if (heartbeatRes.data) {
+                    const diffSecs = (new Date() - new Date(heartbeatRes.data.last_seen)) / 1000;
                     if (diffSecs < 60) {
                         statusDot.style.background = 'var(--success)';
                         statusDot.style.boxShadow = '0 0 10px var(--success)';

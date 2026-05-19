@@ -500,7 +500,12 @@
             try {
                 const { error } = await supabaseClient
                     .from('automation_settings')
-                    .upsert([{ id: 'bot_paused', last_seen: String(newPaused) }]);
+                    .upsert([{
+                        id: 'bot_settings',
+                        last_seen: new Date().toISOString(),
+                        paused: newPaused,
+                        technical_mode: technicalMode
+                    }]);
                 if (error) throw error;
                 botPaused = newPaused;
                 updateControlButtons();
@@ -525,7 +530,12 @@
             try {
                 const { error } = await supabaseClient
                     .from('automation_settings')
-                    .upsert([{ id: 'technical_mode', last_seen: String(newMode) }]);
+                    .upsert([{
+                        id: 'bot_settings',
+                        last_seen: new Date().toISOString(),
+                        paused: botPaused,
+                        technical_mode: newMode
+                    }]);
                 if (error) throw error;
                 technicalMode = newMode;
                 updateControlButtons();
@@ -717,15 +727,14 @@
                 }
 
                 // 3. Verificar Status do Robô + Configurações (em paralelo)
-                const [heartbeatRes, pausedRes, techRes] = await Promise.all([
+                const [heartbeatRes, settingsRes] = await Promise.all([
                     supabaseClient.from('automation_settings').select('last_seen').eq('id', 'robot_heartbeat').maybeSingle(),
-                    supabaseClient.from('automation_settings').select('last_seen').eq('id', 'bot_paused').maybeSingle(),
-                    supabaseClient.from('automation_settings').select('last_seen').eq('id', 'technical_mode').maybeSingle()
+                    supabaseClient.from('automation_settings').select('paused, technical_mode').eq('id', 'bot_settings').maybeSingle()
                 ]);
 
                 // Atualiza estado dos botões de controle
-                botPaused = pausedRes.data?.last_seen === 'true';
-                technicalMode = techRes.data?.last_seen === 'true';
+                botPaused = settingsRes.data?.paused === true;
+                technicalMode = settingsRes.data?.technical_mode === true;
                 updateControlButtons();
 
                 // Atualiza badge de status no header
